@@ -48,6 +48,15 @@ function mockReleaseResponse(tagName: string, htmlUrl = "https://example.com/rel
 	});
 }
 
+function resetUpdateCheckMocks() {
+	localStorage.clear();
+	global.fetch = vi.fn() as unknown as typeof fetch;
+	toastMock.mockClear();
+	toastSuccess.mockClear();
+	toastError.mockClear();
+	openExternalUrl.mockClear();
+}
+
 describe("isNewer", () => {
 	it("detects a higher minor version", () => {
 		expect(isNewer("1.3.0", "1.2.0")).toBe(true);
@@ -71,14 +80,7 @@ describe("isNewer", () => {
 });
 
 describe("maybeShowUpdateToast", () => {
-	beforeEach(() => {
-		localStorage.clear();
-		global.fetch = vi.fn() as unknown as typeof fetch;
-		toastMock.mockClear();
-		toastSuccess.mockClear();
-		toastError.mockClear();
-		openExternalUrl.mockClear();
-	});
+	beforeEach(resetUpdateCheckMocks);
 
 	afterEach(() => {
 		vi.restoreAllMocks();
@@ -121,7 +123,7 @@ describe("maybeShowUpdateToast", () => {
 		mockReleaseResponse("v1.3.0", "https://example.com/release/1.3.0");
 		await maybeShowUpdateToast("1.2.0");
 		const [, options] = toastMock.mock.calls[0];
-		options.action.onClick();
+		await options.action.onClick();
 		expect(openExternalUrl).toHaveBeenCalledWith("https://example.com/release/1.3.0");
 	});
 
@@ -143,13 +145,7 @@ describe("maybeShowUpdateToast", () => {
 });
 
 describe("forceCheckForUpdate", () => {
-	beforeEach(() => {
-		localStorage.clear();
-		global.fetch = vi.fn() as unknown as typeof fetch;
-		toastMock.mockClear();
-		toastSuccess.mockClear();
-		toastError.mockClear();
-	});
+	beforeEach(resetUpdateCheckMocks);
 
 	afterEach(() => {
 		vi.restoreAllMocks();

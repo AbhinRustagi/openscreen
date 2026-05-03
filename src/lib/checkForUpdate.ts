@@ -19,12 +19,16 @@ export async function fetchLatestRelease(): Promise<LatestRelease | null> {
 			headers: { Accept: "application/vnd.github+json" },
 		});
 		if (!response.ok) return null;
-		const data = (await response.json()) as { tag_name?: unknown; html_url?: unknown };
+		const data = (await response.json()) as {
+			tag_name?: unknown;
+			html_url?: unknown;
+		};
 		if (typeof data.tag_name !== "string" || typeof data.html_url !== "string") return null;
 		const version = data.tag_name.replace(/^v/, "");
 		if (version.includes("-")) return null;
 		return { version, htmlUrl: data.html_url };
-	} catch {
+	} catch (error) {
+		console.error("checkForUpdate failed:", error);
 		return null;
 	}
 }
@@ -79,7 +83,9 @@ export async function forceCheckForUpdate(currentVersion: string): Promise<void>
 		return;
 	}
 	if (!isNewer(release.version, currentVersion)) {
-		toast.success("OpenScreen is up to date", { description: `You're on ${currentVersion}` });
+		toast.success("OpenScreen is up to date", {
+			description: `You're on ${currentVersion}`,
+		});
 		return;
 	}
 	showUpdateAvailableToast(release, currentVersion);
