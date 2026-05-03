@@ -7,7 +7,7 @@ import { TooltipProvider } from "./components/ui/tooltip";
 import { ShortcutsConfigDialog } from "./components/video-editor/ShortcutsConfigDialog";
 import VideoEditor from "./components/video-editor/VideoEditor";
 import { ShortcutsProvider } from "./contexts/ShortcutsContext";
-import { maybeShowUpdateToast } from "./lib/checkForUpdate";
+import { forceCheckForUpdate, maybeShowUpdateToast } from "./lib/checkForUpdate";
 import { loadAllCustomFonts } from "./lib/customFonts";
 
 const UPDATE_CHECK_DELAY_MS = 3000;
@@ -44,6 +44,21 @@ export default function App() {
 			maybeShowUpdateToast(version);
 		}, UPDATE_CHECK_DELAY_MS);
 		return () => clearTimeout(id);
+	}, [windowType]);
+
+	useEffect(() => {
+		if (
+			windowType === "hud-overlay" ||
+			windowType === "source-selector" ||
+			windowType === "countdown-overlay"
+		) {
+			return;
+		}
+		const unsubscribe = window.electronAPI.onMenuCheckForUpdates(async () => {
+			const version = await window.electronAPI.getAppVersion();
+			forceCheckForUpdate(version);
+		});
+		return unsubscribe;
 	}, [windowType]);
 
 	const content = (() => {
