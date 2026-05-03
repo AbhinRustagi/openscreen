@@ -40,8 +40,12 @@ export default function App() {
 	useEffect(() => {
 		if (windowType !== "") return;
 		const id = setTimeout(async () => {
-			const version = await window.electronAPI.getAppVersion();
-			maybeShowUpdateToast(version);
+			try {
+				const version = await window.electronAPI.getAppVersion();
+				await maybeShowUpdateToast(version);
+			} catch (error) {
+				console.error("Error during on-start update check in App useEffect:", error);
+			}
 		}, UPDATE_CHECK_DELAY_MS);
 		return () => clearTimeout(id);
 	}, [windowType]);
@@ -55,8 +59,12 @@ export default function App() {
 			return;
 		}
 		const unsubscribe = window.electronAPI.onMenuCheckForUpdates(async () => {
-			const version = await window.electronAPI.getAppVersion();
-			forceCheckForUpdate(version);
+			try {
+				const version = await window.electronAPI.getAppVersion();
+				forceCheckForUpdate(version);
+			} catch (error) {
+				console.error("Error handling onMenuCheckForUpdates in App:", error);
+			}
 		});
 		return unsubscribe;
 	}, [windowType]);
