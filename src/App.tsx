@@ -7,7 +7,10 @@ import { TooltipProvider } from "./components/ui/tooltip";
 import { ShortcutsConfigDialog } from "./components/video-editor/ShortcutsConfigDialog";
 import VideoEditor from "./components/video-editor/VideoEditor";
 import { ShortcutsProvider } from "./contexts/ShortcutsContext";
+import { maybeShowUpdateToast } from "./lib/checkForUpdate";
 import { loadAllCustomFonts } from "./lib/customFonts";
+
+const UPDATE_CHECK_DELAY_MS = 3000;
 
 export default function App() {
 	const [windowType, setWindowType] = useState(
@@ -33,6 +36,15 @@ export default function App() {
 			console.error("Failed to load custom fonts:", error);
 		});
 	}, []);
+
+	useEffect(() => {
+		if (windowType !== "") return;
+		const id = setTimeout(async () => {
+			const version = await window.electronAPI.getAppVersion();
+			maybeShowUpdateToast(version);
+		}, UPDATE_CHECK_DELAY_MS);
+		return () => clearTimeout(id);
+	}, [windowType]);
 
 	const content = (() => {
 		switch (windowType) {
