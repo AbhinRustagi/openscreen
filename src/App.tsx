@@ -38,7 +38,7 @@ export default function App() {
 	}, []);
 
 	useEffect(() => {
-		if (windowType !== "") return;
+		if (windowType !== "editor") return;
 		const id = setTimeout(async () => {
 			try {
 				const version = await window.electronAPI.getAppVersion();
