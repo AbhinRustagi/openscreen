@@ -3,6 +3,7 @@ import { FolderOpen, Languages, Save, Video } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { toast } from "sonner";
+import { McpServerDialog } from "@/components/mcp/McpServerDialog";
 import {
 	Dialog,
 	DialogContent,
@@ -39,6 +40,8 @@ import {
 	saveUserPreferences,
 } from "@/lib/userPreferences";
 import { BackgroundLoadError } from "@/lib/wallpaper";
+import { McpToolHost } from "@/mcp/McpToolHost";
+import type { McpEditorControls } from "@/mcp/toolHandlers";
 import { nativeBridgeClient, useCursorRecordingData, useCursorTelemetry } from "@/native";
 import type { NativePlatform } from "@/native/contracts";
 import {
@@ -1960,6 +1963,82 @@ export default function VideoEditor() {
 		}
 	}, []);
 
+	const [mcpDialogOpen, setMcpDialogOpen] = useState(false);
+	const editorStateRef = useRef(editorState);
+	editorStateRef.current = editorState;
+	const isPlayingRef = useRef(isPlaying);
+	isPlayingRef.current = isPlaying;
+	const currentProjectMediaRef = useRef(currentProjectMedia);
+	currentProjectMediaRef.current = currentProjectMedia;
+
+	useEffect(() => {
+		return window.electronAPI.mcp.onOpenDialog(() => setMcpDialogOpen(true));
+	}, []);
+
+	const mcpControls = useMemo<McpEditorControls>(
+		() => ({
+			getState: () => editorStateRef.current,
+			pushState: (patch) => pushState(patch),
+			getMedia: () => currentProjectMediaRef.current,
+			getCurrentTimeMs: () => Math.round(currentTimeRef.current * 1000),
+			getDurationMs: () => Math.round(durationRef.current * 1000),
+			getIsPlaying: () => isPlayingRef.current,
+			seekMs: (timestampMs) => {
+				const video = videoPlaybackRef.current?.video;
+				if (!video) return;
+				video.currentTime = timestampMs / 1000;
+			},
+			captureSourceFrame: async (timestampMs) => {
+				const video = videoPlaybackRef.current?.video;
+				if (!video) throw new Error("No video loaded");
+				const target = timestampMs / 1000;
+				if (Math.abs(video.currentTime - target) > 0.05) {
+					await new Promise<void>((resolve) => {
+						const onSeeked = () => {
+							video.removeEventListener("seeked", onSeeked);
+							resolve();
+						};
+						video.addEventListener("seeked", onSeeked);
+						video.currentTime = target;
+					});
+				}
+				const canvas = document.createElement("canvas");
+				canvas.width = video.videoWidth || 1920;
+				canvas.height = video.videoHeight || 1080;
+				const ctx = canvas.getContext("2d");
+				if (!ctx) throw new Error("Canvas 2D context unavailable");
+				ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+				return canvas.toDataURL("image/png").split(",")[1] ?? "";
+			},
+			captureRenderedFrame: async (timestampMs) => {
+				const video = videoPlaybackRef.current?.video;
+				const target = timestampMs / 1000;
+				if (video && Math.abs(video.currentTime - target) > 0.05) {
+					await new Promise<void>((resolve) => {
+						const onSeeked = () => {
+							video.removeEventListener("seeked", onSeeked);
+							resolve();
+						};
+						video.addEventListener("seeked", onSeeked);
+						video.currentTime = target;
+					});
+				}
+				// Wait two animation frames so PixiJS has rendered the new state.
+				await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+				const container = videoPlaybackRef.current?.containerRef?.current;
+				const canvas = container?.querySelector<HTMLCanvasElement>("canvas");
+				if (!canvas) throw new Error("Rendered preview canvas not found");
+				return canvas.toDataURL("image/png").split(",")[1] ?? "";
+			},
+			exportProject: async () => {
+				throw new Error(
+					"Export via MCP is not yet supported. Use the Export button in the editor (Cmd+E).",
+				);
+			},
+		}),
+		[pushState],
+	);
+
 	const handleSaveDiagnostic = useCallback(async () => {
 		const result = await window.electronAPI.saveDiagnostic({
 			error: exportError ?? "Manual diagnostic export",
@@ -2402,6 +2481,9 @@ export default function VideoEditor() {
 				onDiscardAndClose={handleCloseConfirmDiscard}
 				onCancel={handleCloseConfirmCancel}
 			/>
+
+			<McpToolHost controls={mcpControls} />
+			<McpServerDialog open={mcpDialogOpen} onOpenChange={setMcpDialogOpen} />
 		</div>
 	);
 }
