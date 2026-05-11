@@ -194,6 +194,20 @@ interface Window {
 			projectState: unknown;
 			logs: string[];
 		}) => Promise<{ success: boolean; path?: string; canceled?: boolean; error?: string }>;
+		writeClipboard: (text: string) => Promise<{ success: boolean }>;
+		mcp: {
+			start: () => Promise<import("../src/mcp/types").McpServerInfo>;
+			stop: () => Promise<import("../src/mcp/types").McpServerInfo>;
+			status: () => Promise<import("../src/mcp/types").McpServerInfo>;
+			onStatusChanged: (
+				callback: (info: import("../src/mcp/types").McpServerInfo) => void,
+			) => () => void;
+			onInvoke: (
+				callback: (request: import("../src/mcp/types").McpInvokeRequest) => void,
+			) => () => void;
+			reply: (response: import("../src/mcp/types").McpInvokeResponse) => void;
+			onOpenDialog: (callback: () => void) => () => void;
+		};
 	};
 }
 

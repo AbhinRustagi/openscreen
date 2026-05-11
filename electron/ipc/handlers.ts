@@ -8,6 +8,7 @@ import type { DesktopCapturerSource } from "electron";
 import {
 	app,
 	BrowserWindow,
+	clipboard,
 	desktopCapturer,
 	dialog,
 	ipcMain,
@@ -34,6 +35,7 @@ import type {
 } from "../../src/native/contracts";
 import { mainT } from "../i18n";
 import { RECORDINGS_DIR } from "../main";
+import { getMcpBridge, getMcpServer } from "../mcp";
 import { createCursorRecordingSession } from "../native-bridge/cursor/recording/factory";
 import type { CursorRecordingSession } from "../native-bridge/cursor/recording/session";
 import { registerNativeBridgeHandlers } from "./nativeBridge";
@@ -1912,5 +1914,55 @@ export function registerIpcHandlers(
 			normalizeVideoSourcePath(videoPath ?? currentVideoPath),
 		loadCursorRecordingData: readCursorRecordingFile,
 		loadCursorTelemetry: readCursorTelemetryFile,
+	});
+
+	registerMcpHandlers(getMainWindow);
+}
+
+function registerMcpHandlers(getMainWindow: () => BrowserWindow | null) {
+	const bridge = getMcpBridge();
+	const server = getMcpServer();
+
+	let lastEditorWindow: BrowserWindow | null = null;
+	function syncEditorWindow() {
+		const next = getMainWindow();
+		if (next === lastEditorWindow) return;
+		lastEditorWindow = next;
+		bridge.setEditorWindow(next);
+	}
+
+	server.onChange((info) => {
+		const target = getMainWindow();
+		if (target && !target.isDestroyed()) {
+			target.webContents.send("mcp:status-changed", info);
+		}
+	});
+
+	ipcMain.handle("mcp:start", async () => {
+		syncEditorWindow();
+		try {
+			return await server.start();
+		} catch (error) {
+			return {
+				...server.getInfo(),
+				status: "error" as const,
+				errorMessage: error instanceof Error ? error.message : String(error),
+			};
+		}
+	});
+
+	ipcMain.handle("mcp:stop", async () => {
+		await server.stop();
+		return server.getInfo();
+	});
+
+	ipcMain.handle("mcp:status", () => {
+		syncEditorWindow();
+		return server.getInfo();
+	});
+
+	ipcMain.handle("clipboard:write-text", (_event, text: string) => {
+		clipboard.writeText(text);
+		return { success: true };
 	});
 }

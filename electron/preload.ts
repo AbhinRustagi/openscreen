@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { NativeWindowsRecordingRequest } from "../src/lib/nativeWindowsRecording";
 import type { RecordingSession, StoreRecordedSessionInput } from "../src/lib/recordingSession";
+import type { McpInvokeRequest, McpInvokeResponse, McpServerInfo } from "../src/mcp/types";
 import { NATIVE_BRIDGE_CHANNEL, type NativeBridgeRequest } from "../src/native/contracts";
 
 // Asset base URL is passed from the main process via webPreferences.additionalArguments
@@ -201,5 +202,30 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	},
 	sendCloseConfirmResponse: (choice: "save" | "discard" | "cancel") => {
 		ipcRenderer.send("close-confirm-response", choice);
+	},
+	writeClipboard: (text: string): Promise<{ success: boolean }> =>
+		ipcRenderer.invoke("clipboard:write-text", text),
+	mcp: {
+		start: (): Promise<McpServerInfo> => ipcRenderer.invoke("mcp:start"),
+		stop: (): Promise<McpServerInfo> => ipcRenderer.invoke("mcp:stop"),
+		status: (): Promise<McpServerInfo> => ipcRenderer.invoke("mcp:status"),
+		onStatusChanged: (callback: (info: McpServerInfo) => void) => {
+			const listener = (_event: unknown, info: McpServerInfo) => callback(info);
+			ipcRenderer.on("mcp:status-changed", listener);
+			return () => ipcRenderer.removeListener("mcp:status-changed", listener);
+		},
+		onInvoke: (callback: (request: McpInvokeRequest) => void) => {
+			const listener = (_event: unknown, request: McpInvokeRequest) => callback(request);
+			ipcRenderer.on("mcp:invoke", listener);
+			return () => ipcRenderer.removeListener("mcp:invoke", listener);
+		},
+		reply: (response: McpInvokeResponse) => {
+			ipcRenderer.send("mcp:reply", response);
+		},
+		onOpenDialog: (callback: () => void) => {
+			const listener = () => callback();
+			ipcRenderer.on("mcp:open-dialog", listener);
+			return () => ipcRenderer.removeListener("mcp:open-dialog", listener);
+		},
 	},
 });

@@ -109,7 +109,7 @@ function isEditorWindow(window: BrowserWindow) {
 }
 
 function sendEditorMenuAction(
-	channel: "menu-load-project" | "menu-save-project" | "menu-save-project-as",
+	channel: "menu-load-project" | "menu-save-project" | "menu-save-project-as" | "mcp:open-dialog",
 ) {
 	let targetWindow = BrowserWindow.getFocusedWindow() ?? mainWindow;
 
@@ -241,6 +241,15 @@ function setupApplicationMenu() {
 				{
 					role: "togglefullscreen",
 					label: mainT("common", "actions.toggleFullScreen") || "Toggle Full Screen",
+				},
+			],
+		},
+		{
+			label: "Tools",
+			submenu: [
+				{
+					label: "MCP Server…",
+					click: () => sendEditorMenuAction("mcp:open-dialog"),
 				},
 			],
 		},
